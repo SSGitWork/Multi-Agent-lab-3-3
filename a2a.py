@@ -28,33 +28,45 @@ Broker must expose:
 import asyncio
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
 
 VALID_AGENTS = {"coder", "qa"}
 VALID_INTENTS = {"review_request", "fix_instruction", "approved"}
 
 
-# ---------------------------------------------------------------------------
-# TODO 1 -- Define the Message dataclass
-# ---------------------------------------------------------------------------
-# @dataclass
-# class Message:
-#     sender:         str
-#     receiver:       str
-#     intent:         str
-#     payload:        dict
-#     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-#
-# def __post_init__(self):  validate all four constraints above
-raise NotImplementedError("TODO 1: Define the Message dataclass.")
+@dataclass
+class Message:
+    sender: str
+    receiver: str
+    intent: str
+    payload: dict
+    correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    def __post_init__(self) -> None:
+        if self.sender not in VALID_AGENTS:
+            raise ValueError(f"Invalid sender: {self.sender}")
+
+        if self.receiver not in VALID_AGENTS:
+            raise ValueError(f"Invalid receiver: {self.receiver}")
+
+        if self.intent not in VALID_INTENTS:
+            raise ValueError(f"Invalid intent: {self.intent}")
+
+        if self.sender == self.receiver:
+            raise ValueError("sender and receiver must be different")
 
 
-# ---------------------------------------------------------------------------
-# TODO 2 -- Define the Broker class
-# ---------------------------------------------------------------------------
-# class Broker:
-#     def __init__(self):
-#         self._queues = {name: asyncio.Queue() for name in VALID_AGENTS}
-#     async def send(self, message): ...
-#     async def receive(self, agent_name): ...
-raise NotImplementedError("TODO 2: Define the Broker class.")
+class Broker:
+    def __init__(self) -> None:
+        self._queues = {name: asyncio.Queue() for name in VALID_AGENTS}
+
+    async def send(self, message: Message) -> None:
+        if message.receiver not in self._queues:
+            raise ValueError(f"Unknown receiver: {message.receiver}")
+
+        await self._queues[message.receiver].put(message)
+
+    async def receive(self, agent_name: str) -> Message:
+        if agent_name not in self._queues:
+            raise ValueError(f"Unknown agent: {agent_name}")
+
+        return await self._queues[agent_name].get()
